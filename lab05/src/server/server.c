@@ -21,7 +21,7 @@
 
 int init_server(const char *port);
 void run_server(int sock_fd);
-void handle_client(int sock_client);
+void handle_client(int sock_client, fd_set master);
 void split_password(const char *password, char *numeric, char *alphabet);
 
 void sigintHandler()
@@ -131,19 +131,21 @@ void run_server(int sock_fd)
     if (!fork())
     {
       close(sock_fd);
-      handle_client(sock_client);
+      fd_set master;
+      FD_ZERO(&master);
+      FD_SET(sock_client, &master);
+      while (FD_ISSET(sock_client, &master))
+      {
+        handle_client(sock_client, master);
+      }
       close(sock_client);
       exit(EXIT_SUCCESS);
     }
   }
 }
 
-void handle_client(int sock_client)
+void handle_client(int sock_client, fd_set master)
 {
-  fd_set master;
-  FD_ZERO(&master);
-  FD_SET(sock_client, &master);
-
   int bytes_recv, bytes_sent;
 
   char mess[BUF_SIZE];
@@ -165,6 +167,7 @@ void handle_client(int sock_client)
       bytes_recv = recv(sock_client, mess, BUF_SIZE, 0);
       if (bytes_recv < 1)
       {
+        FD_CLR(sock_client, &master);
         printf("Connection closed by client\n");
         close(sock_client);
         exit(EXIT_SUCCESS);
@@ -202,6 +205,7 @@ void handle_client(int sock_client)
             bytes_recv = recv(sock_client, mess, BUF_SIZE, 0);
             if (bytes_recv < 1)
             {
+              FD_CLR(sock_client, &master);
               printf("Connection closed by client\n");
               close(sock_client);
               exit(EXIT_SUCCESS);

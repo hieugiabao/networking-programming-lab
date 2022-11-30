@@ -25,6 +25,31 @@ int main(int argc, char *argv[])
 
   printf("Starting client connecting to host: %s on port: %s\n", argv[1], argv[2]);
 
+  memset(&hints, 0, sizeof hints);
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+
+  if ((rv = getaddrinfo(argv[1], argv[2], &hints, &servinfo)) != 0)
+  {
+    fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+    return 1;
+  }
+
+  if ((sock_fd = socket(servinfo->ai_family, servinfo->ai_socktype,
+                        servinfo->ai_protocol)) == -1)
+  {
+    perror("client: socket");
+    exit(EXIT_FAILURE);
+  }
+  if (connect(sock_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1)
+  {
+    close(sock_fd);
+    perror("client: connect");
+    exit(EXIT_FAILURE);
+  }
+  freeaddrinfo(servinfo);
+
+  printf("Connected to server\n");
 #define BUF_SIZE 4096
 
   int bytes_sent, bytes_recv;
@@ -34,30 +59,6 @@ int main(int argc, char *argv[])
 
   while (1)
   {
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC;
-    hints.ai_socktype = SOCK_STREAM;
-
-    if ((rv = getaddrinfo(argv[1], argv[2], &hints, &servinfo)) != 0)
-    {
-      fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
-      return 1;
-    }
-
-    if ((sock_fd = socket(servinfo->ai_family, servinfo->ai_socktype,
-                          servinfo->ai_protocol)) == -1)
-    {
-      perror("client: socket");
-      exit(EXIT_FAILURE);
-    }
-    if (connect(sock_fd, servinfo->ai_addr, servinfo->ai_addrlen) == -1)
-    {
-      close(sock_fd);
-      perror("client: connect");
-      exit(EXIT_FAILURE);
-    }
-    freeaddrinfo(servinfo);
-
     printf("Username: ");
     scanf("%s", username);
     while (getchar() != '\n')
@@ -69,7 +70,6 @@ int main(int argc, char *argv[])
     sprintf(buffer, "%s%c%s%c", username, 0, password, 0);
     // sent to server
     bytes_sent = send(sock_fd, buffer, strlen(username) + strlen(password) + 2, 0);
-    printf("Sent %d bytes to server\n", bytes_sent);
     if (bytes_sent == -1)
     {
       perror("Error occured: Can't send data to server");
@@ -150,8 +150,6 @@ int main(int argc, char *argv[])
     {
       error(status);
     }
-
-    close(sock_fd);
   }
   close(sock_fd);
 }
